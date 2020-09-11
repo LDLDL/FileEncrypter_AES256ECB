@@ -99,6 +99,21 @@ uint8_t *sha256_8(uint8_t *msg, uint64_t len);
 ///         the length of the array is 32, type is uin8_t
 uint8_t *sha256_8(std::string &msg);
 
+/// \class sha256_stream
+class sha256_stream {
+ private:
+  uint32_t *result;
+  bool finish = false;
+ public:
+  sha256_stream();
+
+  ~sha256_stream();
+
+  bool stream_add(uint8_t *msg, uint64_t len);
+
+  uint8_t *get_8_result();
+};
+
 }
 
 #endif //FILEENCRYPTER__SHA256_H_

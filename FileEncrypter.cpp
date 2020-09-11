@@ -4,8 +4,10 @@
 #include <cstring>
 #include <chrono>
 
+
 #include "aes256.h"
 #include "file.h"
+#include "pbkdf2.h"
 
 class NotOurFile : public std::runtime_error{
  public:
@@ -19,11 +21,18 @@ class WrongPassword : public std::runtime_error{
   }
 };
 
+ class FileBroken : public std::runtime_error{
+  public:
+   FileBroken() : std::runtime_error("File Broken."){
+   }
+ };
+
 const uint8_t HEADER[16] {
     0x59, 0x55, 0x4b, 0x49, //YUKI
     0x4d, 0x55, 0x47, 0x49, 0x59, 0x55, //MUGIYU
     0x4c, 0x44, 0x4c, 0x44, 0x4c, 0x44 //LDLDLD
 };
+
 
 /// \class FileEncrypter
 /// \brief class to encrypt or decrypt a file
@@ -53,10 +62,14 @@ class FileEncrypter{
   std::string read_file_path;
   std::string write_file_path;
   aes::AES256ECB e;
+  sha::sha256_stream sha;
   std::unique_ptr<file::file_reader> fr;
   std::unique_ptr<file::file_writer> fw;
   uint8_t *buffer;
+  uint8_t *sha_buffer;
   int buff_size = 16;
+  int sha_buff_size = 64;
+  int SHA256_RESULT_SIZE = 32;
   uint64_t read_file_size;
   uint64_t write_file_size;
  public:
@@ -71,9 +84,11 @@ class FileEncrypter{
       pwd(_pwd),
       read_file_path(_read_file_path),
       write_file_path(_write_file_path),
-      e(pwd){
+      e(pwd),
+      sha(){
     //create buffer array
     buffer = new uint8_t[buff_size];
+    sha_buffer = new uint8_t[sha_buff_size];
   }
 
   /// \brief destructor
@@ -83,6 +98,8 @@ class FileEncrypter{
     fr = nullptr;
     delete [] buffer;
     buffer = nullptr;
+    delete [] sha_buffer;
+    sha_buffer = nullptr;
   }
 
   /// \brief do encrypt
@@ -90,14 +107,22 @@ class FileEncrypter{
     //open file
     fr = std::make_unique<file::file_reader>(read_file_path, buff_size);
     read_file_size = fr->get_size();
-    write_file_size = read_file_size + 48;
+    write_file_size = read_file_size + 80;
     fw = std::make_unique<file::file_writer>(write_file_path, write_file_size);
 
-    //write header and encrypted header
+    //write header and pbkdf2 stored key header
     memcpy(buffer, HEADER, 16);
     fw->write(buffer, buff_size);
-    e.encrypt(buffer);
-    fw->write(buffer, buff_size);
+    auto _k = sha::sha256_8(pwd);
+    auto _pb = pbkdf2::pbkdf2_8_32_sha256(_k, 32, 4096);
+    fw->write(_pb, SHA256_RESULT_SIZE);
+    delete [] _k;
+    delete [] _pb;
+
+    //write file hash to head
+    auto _h = calculate_sha256(read_file_path);
+    fw->write(_h, SHA256_RESULT_SIZE);
+    delete [] _h;
 
     //read size
     int _rs;
@@ -145,17 +170,31 @@ class FileEncrypter{
       }
     }
 
-    //read encrypted header and check
+    //read pbkdf2 stored key header and check
+    auto _k = sha::sha256_8(pwd);
+    auto _pb = pbkdf2::pbkdf2_8_32_sha256(_k, 32, 4096);
     fr->read(buffer);
-    e.decrypt(buffer);
     for(int i = 0; i < buff_size; ++i){
-      if(buffer[i] != HEADER[i]){
+      if(buffer[i] != _pb[i]){
         throw WrongPassword();
       }
     }
+    fr->read(buffer);
+    for(int i = 0; i < buff_size; ++i){
+      if(buffer[i] != _pb[i+16]){
+        throw WrongPassword();
+      }
+    }
+    delete [] _k;
+    delete [] _pb;
+
+    //read file hash
+    auto _sha_value = new uint8_t[32];
+    fr->read(_sha_value);
+    fr->read(_sha_value + 16);
 
     read_file_size = fr->get_size();
-    write_file_size = read_file_size - 32;
+    write_file_size = read_file_size;
     fw = std::make_unique<file::file_writer>(write_file_path, write_file_size);
 
     //read and decrypt
@@ -176,6 +215,42 @@ class FileEncrypter{
     //close file
     fw = nullptr;
     fr = nullptr;
+
+    auto _s = calculate_sha256(write_file_path);
+    for(int i = 0; i < SHA256_RESULT_SIZE; ++i){
+      if(_sha_value[i] != _s[i]){
+        throw FileBroken();
+      }
+    }
+    delete [] _s;
+    delete [] _sha_value;
+  }
+
+ uint8_t *calculate_sha256(std::string &file_path){
+    //open file
+    auto _fr = std::make_unique<file::file_reader>(file_path, sha_buff_size);
+    read_file_size = _fr->get_size();
+
+    //read size
+    int _rs;
+
+    while(true){
+      _rs = _fr->read(sha_buffer);
+      if (_rs < sha_buff_size)
+        break;
+      sha.stream_add(sha_buffer, _rs);
+    }
+
+    sha.stream_add(sha_buffer, _rs);
+
+    _fr->close();
+    _fr = nullptr;
+
+    return sha.get_8_result();
+
+//    for (int i = 0; i < 32; ++i){
+//      std::cout << std::hex << std::setw(2) << std::setfill('0') <<(short int)r[i];
+//    }
   }
 };
 
@@ -332,6 +407,11 @@ void decrypt_func(GtkWidget *widget, gpointer *data){
     return;
   } catch (WrongPassword &e) {
     gtk_label_set_text((GtkLabel *) _p->message_label, "\nWrong password.\n");
+    _f = nullptr;
+    enable_button(_p);
+    return;
+  }catch (FileBroken &e) {
+    gtk_label_set_text((GtkLabel *) _p->message_label, "\nFile broken.\n");
     _f = nullptr;
     enable_button(_p);
     return;

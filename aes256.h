@@ -6,7 +6,7 @@
 #define FILEENCRYPTER__AES256_H_
 
 
-#include "pbkdf2.h"
+#include "sha256.h"
 
 #define MIJ(m, i , j) m[(i * 4) + (j)]
 #define Multiply(x, y)                                \
@@ -22,7 +22,7 @@
 
 namespace aes{
 
-using namespace pbkdf2;
+using namespace sha;
 
 //sbox
 static const uint8_t sbox[256]{

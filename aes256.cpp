@@ -186,8 +186,8 @@ inline void AES256ECB::RoundKeyAdd(uint8_t *msg, int round) {
 }
 
 AES256ECB::AES256ECB(std::string &pwd) {
-  //use pbkdf2 to convert password to 256bit key
-  key = pbkdf2_8_32_sha256(pwd, 1024);
+  //use sha256 to convert password to 256bit key
+  key = sha256_8(pwd);
   // expand key
   key_expansion();
 }

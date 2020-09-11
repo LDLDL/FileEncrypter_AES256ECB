@@ -32,6 +32,9 @@ static const uint8_t init_salt[32]{
 ///         length of the array is 32.
 uint8_t *pbkdf2_8_32_sha256(std::string &pwd, uint64_t iter);
 
+/// \brief the same function with different param
+uint8_t *pbkdf2_8_32_sha256(uint8_t *pwd, int len, uint64_t iter);
+
 /// \brief pbkdf2: password based key derivation function 2
 /// \details hmac function is sha256, key length is 256.
 /// \param pwd password string

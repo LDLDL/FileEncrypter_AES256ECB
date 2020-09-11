@@ -198,3 +198,63 @@ uint8_t *sha::sha256_8(std::string &msg) {
 
   return result;
 }
+
+sha::sha256_stream::sha256_stream() {
+  this->result = new uint32_t[8];
+
+  //set hash initial value to result array
+  for (int i = 0; i < 8; i++)
+    result[i] = hinit[i];
+}
+
+sha::sha256_stream::~sha256_stream() {
+  delete [] result;
+  result = nullptr;
+}
+
+bool sha::sha256_stream::stream_add(uint8_t *msg, uint64_t len) {
+  if(len == SHA256_BLOCK_SIZE){
+    sha::_sha256_calculate(msg, this->result);
+    return true;
+  }
+  if(len < SHA256_BLOCK_SIZE){
+    uint64_t block_n = ((len < 56) ? 1 : 2);
+    uint64_t _msg_len = block_n * SHA256_BLOCK_SIZE;
+
+    //create temp space
+    auto _msg = new uint8_t[_msg_len]{0};
+
+    //copy memory
+    memcpy(_msg, msg, len);
+
+    auto _mp = _msg;
+    for (int i = 0; i < block_n; ++i){
+      //calculate this block
+      _sha256_calculate(_mp, result);
+      //_mp point to the next block
+      _mp += SHA256_BLOCK_SIZE;
+    }
+    _mp = nullptr;
+
+    delete [] _msg;
+    _msg = nullptr;
+  }
+  else{
+    return false;
+  }
+
+  return true;
+}
+
+uint8_t *sha::sha256_stream::get_8_result() {
+  auto result_8 = new uint8_t[32];
+
+  for (int i = 0; i < 8; ++i){
+    result_8[i*4 + 3] = this->result[i];
+    result_8[i*4 + 2] = this->result[i] >> 8;
+    result_8[i*4 + 1] = this->result[i] >> 16;
+    result_8[i*4] = this->result[i] >> 24;
+  }
+
+  return result_8;
+}
