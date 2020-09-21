@@ -21,7 +21,7 @@ class WrongPassword : public std::runtime_error{
   }
 };
 
- class FileBroken : public std::runtime_error{
+class FileBroken : public std::runtime_error{
   public:
    FileBroken() : std::runtime_error("File Broken."){
    }
@@ -62,7 +62,7 @@ class FileEncrypter{
   std::string read_file_path;
   std::string write_file_path;
   aes::AES256ECB e;
-  sha::sha256_stream sha;
+  std::unique_ptr<sha::sha256_stream> sha;
   std::unique_ptr<file::file_reader> fr;
   std::unique_ptr<file::file_writer> fw;
   uint8_t *buffer;
@@ -84,8 +84,7 @@ class FileEncrypter{
       pwd(_pwd),
       read_file_path(_read_file_path),
       write_file_path(_write_file_path),
-      e(pwd),
-      sha(){
+      e(pwd){
     //create buffer array
     buffer = new uint8_t[buff_size];
     sha_buffer = new uint8_t[sha_buff_size];
@@ -96,6 +95,7 @@ class FileEncrypter{
   ~FileEncrypter(){
     fw = nullptr;
     fr = nullptr;
+    sha = nullptr;
     delete [] buffer;
     buffer = nullptr;
     delete [] sha_buffer;
@@ -231,6 +231,8 @@ class FileEncrypter{
     auto _fr = std::make_unique<file::file_reader>(file_path, sha_buff_size);
     read_file_size = _fr->get_size();
 
+    sha = std::make_unique<sha::sha256_stream>(read_file_size);
+
     //read size
     int _rs;
 
@@ -238,15 +240,15 @@ class FileEncrypter{
       _rs = _fr->read(sha_buffer);
       if (_rs < sha_buff_size)
         break;
-      sha.stream_add(sha_buffer, _rs);
+      sha->stream_add(sha_buffer, _rs);
     }
 
-    sha.stream_add(sha_buffer, _rs);
+    sha->stream_add(sha_buffer, _rs);
 
     _fr->close();
     _fr = nullptr;
 
-    return sha.get_8_result();
+    return sha->get_8_result();
 
 //    for (int i = 0; i < 32; ++i){
 //      std::cout << std::hex << std::setw(2) << std::setfill('0') <<(short int)r[i];

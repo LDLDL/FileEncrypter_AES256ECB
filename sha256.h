@@ -103,9 +103,9 @@ uint8_t *sha256_8(std::string &msg);
 class sha256_stream {
  private:
   uint32_t *result;
-  bool finish = false;
+  uint64_t stream_size;
  public:
-  sha256_stream();
+  sha256_stream(uint64_t stream_size);
 
   ~sha256_stream();
 

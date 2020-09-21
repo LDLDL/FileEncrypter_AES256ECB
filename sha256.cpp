@@ -1,7 +1,6 @@
 //
 // Created by yuki on 2020/5/16.
 //
-
 #include "sha256.h"
 
 static inline uint32_t sha::_ma(uint32_t x, uint32_t y, uint32_t z){
@@ -135,8 +134,9 @@ uint32_t *sha::sha256(std::string &msg) {
   _msg[len] = 0x80;
 
   //set original message length to the last 64bit of last block
-  for(int i = 0; i < 8; ++i)
+  for(int i = 0; i < 8; ++i){
     _msg[block_n * SHA256_BLOCK_SIZE - 1 - i] = ((len*8) >> i*8) & 0xff;
+  }
 
   //create a array to store result
   auto result = new uint32_t[8];
@@ -199,8 +199,9 @@ uint8_t *sha::sha256_8(std::string &msg) {
   return result;
 }
 
-sha::sha256_stream::sha256_stream() {
+sha::sha256_stream::sha256_stream(uint64_t stream_size) {
   this->result = new uint32_t[8];
+  this->stream_size = stream_size;
 
   //set hash initial value to result array
   for (int i = 0; i < 8; i++)
@@ -226,6 +227,13 @@ bool sha::sha256_stream::stream_add(uint8_t *msg, uint64_t len) {
 
     //copy memory
     memcpy(_msg, msg, len);
+
+    //add needed message
+    _msg[len] = 0x80;
+
+    //set original message length
+    for(int i = 0; i < 8; ++i)
+      _msg[block_n * SHA256_BLOCK_SIZE - 1 - i] = ((stream_size*8) >> i*8) & 0xff;
 
     auto _mp = _msg;
     for (int i = 0; i < block_n; ++i){
