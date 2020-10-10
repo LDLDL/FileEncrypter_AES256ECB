@@ -235,15 +235,13 @@ class FileEncrypter{
 
     //read size
     int _rs;
-
-    while(true){
-      _rs = _fr->read(sha_buffer);
-      if (_rs < sha_buff_size)
-        break;
+   _rs = _fr->read(sha_buffer);
+    while(_rs == sha::SHA256_BLOCK_SIZE){
       sha->stream_add(sha_buffer, _rs);
+      _rs = _fr->read(sha_buffer);
     }
 
-    sha->stream_add(sha_buffer, _rs);
+    sha->stream_last_block(sha_buffer, _rs);
 
     _fr->close();
     _fr = nullptr;

@@ -111,6 +111,8 @@ class sha256_stream {
 
   bool stream_add(uint8_t *msg, uint64_t len);
 
+  bool stream_last_block(uint8_t *msg, uint64_t len);
+
   uint8_t *get_8_result();
 };
 

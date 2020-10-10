@@ -218,6 +218,27 @@ bool sha::sha256_stream::stream_add(uint8_t *msg, uint64_t len) {
     sha::_sha256_calculate(msg, this->result);
     return true;
   }
+  else{
+    return false;
+  }
+}
+
+bool sha::sha256_stream::stream_last_block(uint8_t *msg, uint64_t len) {
+  if(len == SHA256_BLOCK_SIZE){
+    _sha256_calculate(msg, this->result);
+
+    auto _msg = new uint8_t[SHA256_BLOCK_SIZE]{0};
+    _msg[0] = 0x80;
+
+    //set original message length
+    for(int i = 0; i < 8; ++i)
+      _msg[SHA256_BLOCK_SIZE - 1 - i] = ((stream_size*8) >> i*8) & 0xff;
+
+    _sha256_calculate(_msg, result);
+
+    return true;
+  }
+
   if(len < SHA256_BLOCK_SIZE){
     uint64_t block_n = ((len < 56) ? 1 : 2);
     uint64_t _msg_len = block_n * SHA256_BLOCK_SIZE;
@@ -246,12 +267,11 @@ bool sha::sha256_stream::stream_add(uint8_t *msg, uint64_t len) {
 
     delete [] _msg;
     _msg = nullptr;
-  }
-  else{
-    return false;
+
+    return true;
   }
 
-  return true;
+  return false;
 }
 
 uint8_t *sha::sha256_stream::get_8_result() {
